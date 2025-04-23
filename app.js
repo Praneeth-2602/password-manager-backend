@@ -31,13 +31,8 @@ const User = mongoose.model('User', userSchema);
 // Password Schema
 const passwordSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  title: { type: String, required: true },
-  username: { type: String, required: true },
-  password: { type: String, required: true },
-  website: String,
-  notes: String,
-  category: String,
-  favorite: { type: Boolean, default: false },
+  encryptedData: { type: String, required: true },  // Base64 encoded encrypted data
+  iv: { type: String, required: true },            // Base64 encoded initialization vector
   lastModified: { type: Date, default: Date.now }
 });
 
@@ -63,6 +58,102 @@ const auth = async (req, res, next) => {
 };
 
 // Routes
+
+// Check if email exists
+app.post('/check-email', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    res.json({
+      success: true,
+      data: { exists: !!user }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error checking email',
+      error: error.message
+    });
+  }
+});
+
+// Update user profile
+app.put('/profile', auth, async (req, res) => {
+  try {
+    const updates = Object.keys(req.body);
+    const allowedUpdates = ['name', 'email'];
+    const isValidOperation = updates.every(update => allowedUpdates.includes(update));
+
+    if (!isValidOperation) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid updates'
+      });
+    }
+
+    updates.forEach(update => req.user[update] = req.body[update]);
+    await req.user.save();
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: req.user
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error updating profile',
+      error: error.message
+    });
+  }
+});
+
+// Verify password
+app.post('/verify-password', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    res.json({
+      success: isMatch,
+      message: isMatch ? 'Password verified' : 'Invalid password'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error verifying password',
+      error: error.message
+    });
+  }
+});
+
+// Update password
+app.put('/password', auth, async (req, res) => {
+  try {
+    const { password } = req.body;
+    req.user.password = await bcrypt.hash(password, 10);
+    await req.user.save();
+
+    res.json({
+      success: true,
+      message: 'Password updated successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error updating password',
+      error: error.message
+    });
+  }
+});
 
 // Signup
 app.post('/signup', async (req, res) => {

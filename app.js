@@ -8,7 +8,16 @@ const jwt = require('jsonwebtoken');
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: '*',  // Allow all origins
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Server is running' });
+});
 app.use(express.json());
 
 // MongoDB Connection
